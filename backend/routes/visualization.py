@@ -8,16 +8,23 @@ from models.visualization import (
 )
 from services.chart_generator import ChartGenerator
 from motor.motor_asyncio import AsyncIOMotorClient
+from dotenv import load_dotenv
+from pathlib import Path
 import os
 import time
 import logging
 
+# Load environment variables
+ROOT_DIR = Path(__file__).parent.parent
+load_dotenv(ROOT_DIR / '.env')
+
 logger = logging.getLogger(__name__)
 
 # Get database connection
-mongo_url = os.environ['MONGO_URL']
-client = AsyncIOMotorClient(mongo_url)
-db = client[os.environ['DB_NAME']]
+mongo_url = os.environ.get('MONGO_URL')
+db_name = os.environ.get('DB_NAME', 'visualization_db')
+client = AsyncIOMotorClient(mongo_url) if mongo_url else None
+db = client[db_name] if client else None
 
 router = APIRouter(prefix="/api/visualization", tags=["visualization"])
 
