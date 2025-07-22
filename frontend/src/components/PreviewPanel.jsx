@@ -19,7 +19,7 @@ const PreviewPanel = ({ visualization }) => {
       // Simulate chart generation
       simulateChartGeneration();
     }
-  }, [visualization]);
+  }, [visualization?.chartType?.id, visualization?.dataset?.name, visualization?.customization]);
 
   const simulateChartGeneration = async () => {
     setIsGenerating(true);
