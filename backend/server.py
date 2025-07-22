@@ -10,6 +10,8 @@ from typing import List
 import uuid
 from datetime import datetime
 
+# Import visualization routes
+from routes.visualization import router as visualization_router
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -20,13 +22,12 @@ client = AsyncIOMotorClient(mongo_url)
 db = client[os.environ['DB_NAME']]
 
 # Create the main app without a prefix
-app = FastAPI()
+app = FastAPI(title="Python Visualization Generator API", version="1.0.0")
 
-# Create a router with the /api prefix
+# Create a router with the /api prefix for basic routes
 api_router = APIRouter(prefix="/api")
 
-
-# Define Models
+# Define Models for basic status checks
 class StatusCheck(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     client_name: str
@@ -35,10 +36,28 @@ class StatusCheck(BaseModel):
 class StatusCheckCreate(BaseModel):
     client_name: str
 
-# Add your routes to the router instead of directly to app
+# Basic API routes
 @api_router.get("/")
 async def root():
-    return {"message": "Hello World"}
+    return {"message": "Python Visualization Generator API", "status": "running"}
+
+@api_router.get("/health")
+async def health_check():
+    """Health check endpoint"""
+    try:
+        # Test database connection
+        await db.admin.command('ping')
+        return {
+            "status": "healthy",
+            "database": "connected",
+            "services": ["chart_generation", "python_execution", "data_storage"]
+        }
+    except Exception as e:
+        return {
+            "status": "unhealthy", 
+            "error": str(e),
+            "database": "disconnected"
+        }
 
 @api_router.post("/status", response_model=StatusCheck)
 async def create_status_check(input: StatusCheckCreate):
@@ -52,9 +71,11 @@ async def get_status_checks():
     status_checks = await db.status_checks.find().to_list(1000)
     return [StatusCheck(**status_check) for status_check in status_checks]
 
-# Include the router in the main app
+# Include routers
 app.include_router(api_router)
+app.include_router(visualization_router)
 
+# Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
     allow_credentials=True,
@@ -70,6 +91,17 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+@app.on_event("startup")
+async def startup_event():
+    logger.info("Python Visualization Generator API starting up...")
+    logger.info("Available endpoints:")
+    logger.info("- /api/ - Basic API info")
+    logger.info("- /api/health - Health check")
+    logger.info("- /api/visualization/generate - Generate charts")
+    logger.info("- /api/visualization/execute - Execute Python code")
+    logger.info("- /api/visualization/save - Save visualizations")
+
 @app.on_event("shutdown")
 async def shutdown_db_client():
+    logger.info("Shutting down...")
     client.close()
