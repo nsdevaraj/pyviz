@@ -27,7 +27,7 @@ const ChartBuilder = ({ dataset, onVisualizationChange, currentVisualization }) 
         pythonCode: pythonCode
       });
     }
-  }, [selectedChart, dataset, customization, onVisualizationChange]);
+  }, [selectedChart, dataset, customization]);
 
   const handleChartSelect = (chartType) => {
     setSelectedChart(chartType);
