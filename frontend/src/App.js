@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useCallback } from "react";
 import "./App.css";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { Toaster } from "./components/ui/toaster";
@@ -10,17 +10,17 @@ const VisualizationPlatform = () => {
   const [dataset, setDataset] = useState(null);
   const [visualization, setVisualization] = useState(null);
 
-  const handleDataChange = (newData) => {
+  const handleDataChange = useCallback((newData) => {
     setDataset(newData);
     // Reset visualization when data changes
     if (!newData) {
       setVisualization(null);
     }
-  };
+  }, []);
 
-  const handleVisualizationChange = (newVisualization) => {
+  const handleVisualizationChange = useCallback((newVisualization) => {
     setVisualization(newVisualization);
-  };
+  }, []);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900">
