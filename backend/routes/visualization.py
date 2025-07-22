@@ -1,12 +1,12 @@
 from fastapi import APIRouter, HTTPException, BackgroundTasks
 from fastapi.responses import JSONResponse
-from ..models.visualization import (
+from models.visualization import (
     ChartGenerationRequest, ChartGenerationResponse,
     PythonExecutionRequest, PythonExecutionResponse,
     SaveVisualizationRequest, SaveVisualizationResponse,
     VisualizationMetadata
 )
-from ..services.chart_generator import ChartGenerator
+from services.chart_generator import ChartGenerator
 from motor.motor_asyncio import AsyncIOMotorClient
 import os
 import time
