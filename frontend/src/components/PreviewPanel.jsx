@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import axios from 'axios';
 import { Card, CardHeader, CardTitle, CardContent } from './ui/card';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
@@ -6,41 +7,25 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { Textarea } from './ui/textarea';
 import { Copy, Download, Play, Eye } from 'lucide-react';
 import { useToast } from '../hooks/use-toast';
-import { mockVisualizationPreview } from '../mock';
 
 const PreviewPanel = ({ visualization }) => {
   const [activeTab, setActiveTab] = useState('preview');
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [previewImage, setPreviewImage] = useState(mockVisualizationPreview);
+  const [isLoading, setIsLoading] = useState(false);
+  const [previewImage, setPreviewImage] = useState(null);
   const { toast } = useToast();
 
   useEffect(() => {
-    if (visualization) {
-      // Simulate chart generation
-      simulateChartGeneration();
+    if (visualization?.chartImage) {
+      setPreviewImage(visualization.chartImage);
     }
-  }, [visualization?.chartType?.id, visualization?.dataset?.name, visualization?.customization]);
-
-  const simulateChartGeneration = async () => {
-    setIsGenerating(true);
-    
-    // Simulate processing delay
-    setTimeout(() => {
-      setPreviewImage(mockVisualizationPreview);
-      setIsGenerating(false);
-      toast({
-        title: "Chart generated",
-        description: "Your visualization has been created successfully",
-      });
-    }, 1500);
-  };
+  }, [visualization?.chartImage]);
 
   const copyCode = () => {
     if (visualization?.pythonCode) {
       navigator.clipboard.writeText(visualization.pythonCode);
       toast({
-        title: "Code copied",
-        description: "Python code copied to clipboard",
+        title: 'Code copied',
+        description: 'Python code copied to clipboard',
       });
     }
   };
@@ -54,22 +39,33 @@ const PreviewPanel = ({ visualization }) => {
       a.download = `${visualization.dataset?.name || 'visualization'}_script.py`;
       a.click();
       URL.revokeObjectURL(url);
-      
       toast({
-        title: "Code downloaded",
-        description: "Python script has been downloaded",
+        title: 'Code downloaded',
+        description: 'Python script has been downloaded',
       });
     }
   };
 
-  const executeCode = () => {
-    // In a real implementation, this would execute Python code in the browser
-    toast({
-      title: "Code execution",
-      description: "This will execute Python code in browser (Pyodide integration needed)",
-      variant: "default"
-    });
-    simulateChartGeneration();
+  const executeCode = async () => {
+    if (!visualization?.pythonCode) return;
+    setIsLoading(true);
+    try {
+      const response = await axios.post('/api/visualization/execute', {
+        code: visualization.pythonCode,
+        dataset: visualization.dataset,
+      });
+      const data = response.data;
+      if (data.success && data.chart_image) {
+        setPreviewImage(data.chart_image);
+        toast({ title: 'Execution successful', description: 'Visualization updated' });
+      } else {
+        toast({ title: 'Error', description: data.error_message || 'Execution failed', variant: 'destructive' });
+      }
+    } catch (error) {
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   if (!visualization) {
@@ -95,20 +91,17 @@ const PreviewPanel = ({ visualization }) => {
           <span className="flex items-center gap-2">
             🖼️ Live Preview
             <Badge variant="secondary">{chartType?.name}</Badge>
-            {isGenerating && <Badge variant="outline">Generating...</Badge>}
+            {isLoading && <Badge variant="outline">Loading...</Badge>}
           </span>
           <div className="flex gap-2">
             <Button size="sm" variant="outline" onClick={copyCode}>
-              <Copy className="w-4 h-4 mr-1" />
-              Copy
+              <Copy className="w-4 h-4 mr-1" />Copy
             </Button>
             <Button size="sm" variant="outline" onClick={downloadCode}>
-              <Download className="w-4 h-4 mr-1" />
-              Download
+              <Download className="w-4 h-4 mr-1" />Download
             </Button>
-            <Button size="sm" onClick={executeCode} disabled={isGenerating}>
-              <Play className="w-4 h-4 mr-1" />
-              {isGenerating ? 'Generating...' : 'Execute'}
+            <Button size="sm" onClick={executeCode} disabled={isLoading}>
+              <Play className="w-4 h-4 mr-1" />Execute
             </Button>
           </div>
         </CardTitle>
@@ -118,16 +111,13 @@ const PreviewPanel = ({ visualization }) => {
           <div className="px-6 pt-0">
             <TabsList className="grid w-full grid-cols-2">
               <TabsTrigger value="preview" className="flex items-center gap-2">
-                <Eye className="w-4 h-4" />
-                Preview
+                <Eye className="w-4 h-4" />Preview
               </TabsTrigger>
               <TabsTrigger value="code">
-                <span className="font-mono">{'<code/>'}</span>
-                Python Code
+                <span className="font-mono">{'<code/>'}</span>Python Code
               </TabsTrigger>
             </TabsList>
           </div>
-
           <TabsContent value="preview" className="p-6 pt-4">
             <div className="space-y-4">
               {/* Chart Info */}
@@ -135,49 +125,33 @@ const PreviewPanel = ({ visualization }) => {
                 <Badge variant="outline">{chartType.library}</Badge>
                 <Badge variant="outline">{customization.theme.name} theme</Badge>
                 <Badge variant="outline">{customization.colors.name} colors</Badge>
-                <Badge variant="outline">
-                  {customization.size.width} × {customization.size.height}
-                </Badge>
+                <Badge variant="outline">{customization.size.width} × {customization.size.height}</Badge>
               </div>
-
               {/* Preview Area */}
               <div className="border rounded-lg overflow-hidden bg-muted/50">
-                {isGenerating ? (
+                {(!previewImage || isLoading) ? (
                   <div className="flex items-center justify-center h-96">
                     <div className="text-center">
                       <div className="animate-spin text-4xl mb-4">⚙️</div>
-                      <p className="text-muted-foreground">Generating visualization...</p>
+                      <p className="text-muted-foreground">Loading visualization...</p>
                     </div>
                   </div>
                 ) : (
-                  <div className="relative">
-                    <img 
-                      src={previewImage} 
-                      alt="Chart Preview" 
-                      className="w-full h-auto"
-                      style={{ 
-                        minHeight: '400px',
-                        maxHeight: '600px',
-                        objectFit: 'contain',
-                        background: customization.theme.value === 'dark' ? '#1a1a1a' : '#ffffff'
-                      }}
-                    />
-                    <div className="absolute inset-0 flex items-center justify-center bg-muted/80">
-                      <div className="text-center p-8 bg-background rounded-lg shadow-lg border">
-                        <div className="text-6xl mb-4">{chartType.icon}</div>
-                        <h3 className="text-xl font-bold mb-2">{dataset.name}</h3>
-                        <p className="text-muted-foreground mb-4">{chartType.name} Preview</p>
-                        <p className="text-sm text-muted-foreground">
-                          Frontend Python execution will render actual charts here
-                        </p>
-                      </div>
-                    </div>
-                  </div>
+                  <img
+                    src={previewImage}
+                    alt="Chart Preview"
+                    className="w-full h-auto"
+                    style={{
+                      minHeight: '400px',
+                      maxHeight: '600px',
+                      objectFit: 'contain',
+                      background: customization.theme.value === 'dark' ? '#1a1a1a' : '#ffffff'
+                    }}
+                  />
                 )}
               </div>
             </div>
           </TabsContent>
-
           <TabsContent value="code" className="p-6 pt-4 h-full">
             <div className="space-y-4">
               <div className="flex items-center justify-between">
@@ -186,13 +160,11 @@ const PreviewPanel = ({ visualization }) => {
                   {pythonCode.split('\n').length} lines
                 </div>
               </div>
-              
               <Textarea
                 value={pythonCode}
                 readOnly
                 className="font-mono text-sm min-h-[500px] bg-muted/50"
               />
-              
               <div className="text-sm text-muted-foreground bg-muted/50 p-4 rounded-lg">
                 <h5 className="font-semibold mb-2">💡 Usage Notes:</h5>
                 <ul className="list-disc list-inside space-y-1">

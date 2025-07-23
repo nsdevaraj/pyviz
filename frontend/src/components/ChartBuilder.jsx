@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
+import axios from 'axios';
+import { useToast } from '../hooks/use-toast';
 import { Card, CardHeader, CardTitle, CardContent } from './ui/card';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { Slider } from './ui/slider';
-import { mockChartTypes, mockCustomizationOptions, generateMockPythonCode } from '../mock';
+import { mockChartTypes, mockCustomizationOptions } from '../mock';
 
 const ChartBuilder = ({ dataset, onVisualizationChange, currentVisualization }) => {
   const [selectedChart, setSelectedChart] = useState(null);
@@ -16,17 +18,46 @@ const ChartBuilder = ({ dataset, onVisualizationChange, currentVisualization }) 
     customWidth: 1200,
     customHeight: 800
   });
+  const [isLoading, setIsLoading] = useState(false);
+  const { toast } = useToast();
 
   useEffect(() => {
-    if (selectedChart && dataset) {
-      const pythonCode = generateMockPythonCode(selectedChart, dataset, customization);
-      onVisualizationChange({
-        chartType: selectedChart,
-        dataset: dataset,
-        customization: customization,
-        pythonCode: pythonCode
-      });
-    }
+    const generateRemoteChart = async () => {
+      if (selectedChart && dataset) {
+        setIsLoading(true);
+        try {
+          const response = await axios.post('/api/visualization/generate', {
+            dataset: dataset,
+            chart_type_id: selectedChart.id,
+            customization: {
+              colors: customization.colors,
+              theme: customization.theme,
+              size: customization.size,
+              custom_width: customization.customWidth,
+              custom_height: customization.customHeight
+            }
+          });
+          const data = response.data;
+          if (data.success) {
+            onVisualizationChange({
+              chartType: selectedChart,
+              dataset,
+              customization,
+              pythonCode: data.python_code,
+              chartImage: data.chart_image
+            });
+            toast({ title: 'Chart generated', description: 'Visualization created successfully' });
+          } else {
+            toast({ title: 'Error', description: data.error_message || 'Failed to generate chart', variant: 'destructive' });
+          }
+        } catch (error) {
+          toast({ title: 'Error', description: error.message, variant: 'destructive' });
+        } finally {
+          setIsLoading(false);
+        }
+      }
+    };
+    generateRemoteChart();
   }, [selectedChart, dataset, customization]);
 
   const handleChartSelect = (chartType) => {
@@ -80,7 +111,6 @@ const ChartBuilder = ({ dataset, onVisualizationChange, currentVisualization }) 
               <TabsTrigger value="statistical">Statistical</TabsTrigger>
               <TabsTrigger value="interactive">Interactive</TabsTrigger>
             </TabsList>
-            
             {Object.entries(chartCategories).map(([category, charts]) => (
               <TabsContent key={category} value={category} className="mt-4">
                 <div className="grid grid-cols-1 gap-2">
@@ -88,10 +118,9 @@ const ChartBuilder = ({ dataset, onVisualizationChange, currentVisualization }) 
                     <Button
                       key={chart.id}
                       variant={selectedChart?.id === chart.id ? "default" : "outline"}
-                      className={`h-auto p-4 justify-start text-left transition-all duration-200 ${
-                        selectedChart?.id === chart.id ? 'ring-2 ring-primary' : 'hover:scale-105'
-                      }`}
+                      className={`h-auto p-4 justify-start text-left transition-all duration-200 ${selectedChart?.id === chart.id ? 'ring-2 ring-primary' : 'hover:scale-105'}`}
                       onClick={() => handleChartSelect(chart)}
+                      disabled={isLoading}
                     >
                       <div className="flex items-start gap-3 w-full">
                         <span className="text-2xl">{chart.icon}</span>
@@ -110,13 +139,11 @@ const ChartBuilder = ({ dataset, onVisualizationChange, currentVisualization }) 
             ))}
           </Tabs>
         </div>
-
         {selectedChart && (
           <>
             {/* Customization Options */}
             <div className="space-y-4 border-t pt-6">
               <h4 className="font-semibold">Customization</h4>
-              
               {/* Color Scheme */}
               <div>
                 <label className="text-sm font-medium mb-2 block">Color Scheme</label>
@@ -127,6 +154,7 @@ const ChartBuilder = ({ dataset, onVisualizationChange, currentVisualization }) 
                       variant={customization.colors.value === colorScheme.value ? "default" : "outline"}
                       className="h-auto p-3 justify-start"
                       onClick={() => updateCustomization('colors', colorScheme)}
+                      disabled={isLoading}
                     >
                       <div className="flex items-center gap-2 w-full">
                         <div className="flex gap-1">
@@ -144,7 +172,6 @@ const ChartBuilder = ({ dataset, onVisualizationChange, currentVisualization }) 
                   ))}
                 </div>
               </div>
-
               {/* Theme */}
               <div>
                 <label className="text-sm font-medium mb-2 block">Theme</label>
@@ -154,10 +181,9 @@ const ChartBuilder = ({ dataset, onVisualizationChange, currentVisualization }) 
                     const theme = mockCustomizationOptions.themes.find(t => t.value === value);
                     updateCustomization('theme', theme);
                   }}
+                  disabled={isLoading}
                 >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     {mockCustomizationOptions.themes.map((theme) => (
                       <SelectItem key={theme.value} value={theme.value}>
@@ -170,7 +196,6 @@ const ChartBuilder = ({ dataset, onVisualizationChange, currentVisualization }) 
                   </SelectContent>
                 </Select>
               </div>
-
               {/* Size */}
               <div>
                 <label className="text-sm font-medium mb-2 block">Chart Size</label>
@@ -180,10 +205,9 @@ const ChartBuilder = ({ dataset, onVisualizationChange, currentVisualization }) 
                     const size = mockCustomizationOptions.sizes.find(s => s.value === value);
                     updateCustomization('size', size);
                   }}
+                  disabled={isLoading}
                 >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     {mockCustomizationOptions.sizes.map((size) => (
                       <SelectItem key={size.value} value={size.value}>
@@ -193,31 +217,24 @@ const ChartBuilder = ({ dataset, onVisualizationChange, currentVisualization }) 
                   </SelectContent>
                 </Select>
               </div>
-
               {customization.size.value === 'custom' && (
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="text-sm font-medium mb-2 block">
-                      Width: {customization.customWidth}px
-                    </label>
+                    <label className="text-sm font-medium mb-2 block">Width: {customization.customWidth}px</label>
                     <Slider
                       value={[customization.customWidth]}
                       onValueChange={([value]) => updateCustomization('customWidth', value)}
-                      max={2000}
-                      min={400}
-                      step={50}
+                      max={2000} min={400} step={50}
+                      disabled={isLoading}
                     />
                   </div>
                   <div>
-                    <label className="text-sm font-medium mb-2 block">
-                      Height: {customization.customHeight}px
-                    </label>
+                    <label className="text-sm font-medium mb-2 block">Height: {customization.customHeight}px</label>
                     <Slider
                       value={[customization.customHeight]}
                       onValueChange={([value]) => updateCustomization('customHeight', value)}
-                      max={1500}
-                      min={300}
-                      step={50}
+                      max={1500} min={300} step={50}
+                      disabled={isLoading}
                     />
                   </div>
                 </div>
